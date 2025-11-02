@@ -1,5 +1,5 @@
 # CS-GY-6953-DL-Midterm
-repo for the midterm project
+Repo for the midterm project
 
 **kt3180** - Khwaab Thareja
 <br>
