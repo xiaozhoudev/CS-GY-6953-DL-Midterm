@@ -1,0 +1,254 @@
+\documentclass[11pt,twocolumn]{article}
+
+% Page setup
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{titlesec}
+
+% Compact spacing
+\setlength{\textfloatsep}{10pt plus 1.0pt minus 2.0pt}
+\setlength{\floatsep}{10pt plus 1.0pt minus 2.0pt}
+\setlength{\intextsep}{10pt plus 1.0pt minus 2.0pt}
+\setlength{\columnsep}{0.25in}
+
+% Section formatting
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{1em}{}
+
+\titlespacing*{\section}{0pt}{12pt plus 2pt minus 2pt}{6pt plus 2pt minus 2pt}
+\titlespacing*{\subsection}{0pt}{10pt plus 2pt minus 2pt}{4pt plus 2pt minus 2pt}
+\titlespacing*{\subsubsection}{0pt}{8pt plus 2pt minus 2pt}{4pt plus 2pt minus 2pt}
+
+\title{\Large\bfseries Midterm Kaggle Competition}
+
+\author{
+  \normalsize Khwaab Thareja$^{\dagger}$, Rachit Pathak$^{\dagger}$, Xiaozhou Wen$^{\dagger}$ \\
+  \normalsize New York University \\
+  \normalsize Deep Learning - Fall 2025 \\
+  \small \texttt{\{kt3180, rmp10015, xw3795\}@nyu.edu}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent This report presents our approach to the Math Question Answer Verification Competition, where we supervised fine-tune a Llama-3 8B model to predict the correctness of mathematical answers. We detail our methodology including data preprocessing, LoRA-based parameter-efficient fine-tuning, prompt engineering strategies, and extensive hyperparameter optimization. Our experiments demonstrate \textcolor{red}{[describe your achievement, e.g., "significant improvement over the baseline"]}, achieving a final test accuracy of \textcolor{red}{X.XXX}. We analyze what techniques proved effective and discuss the challenges encountered. Code and model weights are available at \href{https://github.com/xiaozhoudev/CS-GY-6953-DL-Midterm}{xiaozhoudev/CS-GY-6953-DL-Midterm}.
+\end{abstract}
+
+\section{Introduction}
+
+Automated verification of mathematical answers is essential for intelligent tutoring systems and educational platforms. This competition challenges us to build a binary classifier using Llama-3 8B that determines whether a given answer to a math question is correct or incorrect.
+
+Large Language Models (LLMs) have shown remarkable capabilities in mathematical reasoning~\cite{llama3}, making them ideal candidates for this task. However, fine-tuning such large models requires efficient techniques due to computational constraints. We employ Low-Rank Adaptation (LoRA)~\cite{lora} to make fine-tuning tractable while maintaining performance.
+
+\textbf{Our Approach:} \textcolor{red}{[Briefly describe your main strategy in 2-3 sentences]}
+
+\textbf{Contributions:} \textcolor{red}{[List 2-3 key contributions/findings]}
+
+\section{Dataset}
+
+\subsection{Dataset Description}
+The dataset consists of mathematical questions paired with answers and correctness labels. Each instance contains: (1) \textit{question}: the math problem, (2) \textit{answer}: provided solution (correct/incorrect), (3) \textit{solution}: detailed reasoning, and (4) \textit{is\_correct}: binary label (True/False).
+
+\subsection{Data Analysis}
+\textcolor{red}{[Provide key statistics:]}
+
+\textcolor{red}{Dataset size: X training, Y validation, Z test samples}
+
+\textcolor{red}{Label distribution: X\% correct, Y\% incorrect}
+
+\textcolor{red}{Average lengths: Questions (X tokens), Answers (Y tokens)}
+
+\textcolor{red}{Question type breakdown (if analyzed)}
+
+\subsection{Preprocessing}
+We apply several preprocessing steps: \textcolor{red}{[List your preprocessing"]}. We construct prompts by combining question, answer, and optionally solution text following the template shown in Section~\ref{sec:prompt}.
+
+\section{Methodology}
+
+\subsection{Model Architecture}
+
+\textbf{Llama-3 8B:} We use Llama-3 8B as our base model, a state-of-the-art transformer with 8 billion parameters featuring improved tokenization and extended context length capabilities.
+
+\textbf{LoRA Fine-Tuning:} Given memory constraints, we employ Low-Rank Adaptation (LoRA) which introduces trainable low-rank matrices into attention layers while freezing pre-trained weights. This dramatically reduces trainable parameters from 8B to approximately \textcolor{red}{X}M parameters.
+
+Our LoRA configuration: rank $r=\textcolor{red}{X}$, alpha $\alpha=\textcolor{red}{X}$, dropout $=\textcolor{red}{0.X}$, targeting \textcolor{red}{[query/key/value]} projection matrices.
+
+\textcolor{red}{[If using quantization:] We apply \textcolor{red}{X}-bit quantization using bitsandbytes library to further reduce memory footprint.}
+
+\subsection{Prompt Engineering}
+\label{sec:prompt}
+
+We formulate the task as an instruction-following problem. Our final prompt template:
+
+\begin{small}
+\begin{verbatim}
+Question: {question}
+Answer: {answer}
+[Solution: {solution}]
+
+Determine if the answer is correct.
+Respond with True or False only.
+\end{verbatim}
+\end{small}
+
+\textcolor{red}{[Discuss: Did you include solution text? Why/why not? What other prompts did you try?]}
+
+\subsection{Training Configuration}
+
+Table~\ref{tab:hyperparams} shows our training hyperparameters. \textcolor{red}{[Briefly justify key choices, e.g., "We use a small learning rate to prevent catastrophic forgetting"]}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Learning Rate & \textcolor{red}{X.Xe-X} \\
+Batch Size & \textcolor{red}{X} \\
+Gradient Accumulation & \textcolor{red}{X} \\
+Epochs & \textcolor{red}{X} \\
+Max Sequence Length & \textcolor{red}{XXX} \\
+Warmup Steps & \textcolor{red}{XXX} \\
+Weight Decay & \textcolor{red}{0.0X} \\
+Optimizer & \textcolor{red}{AdamW} \\
+LR Scheduler & \textcolor{red}{cosine} \\
+\bottomrule
+\end{tabular}
+\caption{Training hyperparameters}
+\label{tab:hyperparams}
+\end{table}
+
+We use cross-entropy loss and train for \textcolor{red}{X} epochs on \textcolor{red}{[GPU type, e.g., "A100 40GB"]}. Training takes approximately \textcolor{red}{X hours}.
+
+\section{Experiments and Results}
+
+\subsection{Baseline Performance}
+
+We first evaluate the provided baseline model, which achieves 0.726 test accuracy. \textcolor{red}{[Describe baseline approach briefly]}
+
+\subsection{Experimental Setup}
+
+We conduct ablation studies to understand the impact of different components:
+
+\textbf{Experiment 1:} \textcolor{red}{[e.g., "Impact of solution text in prompt"]}
+
+\textbf{Experiment 2:} \textcolor{red}{[e.g., "LoRA rank variation"]}
+
+\textbf{Experiment 3:} \textcolor{red}{[e.g., "Learning rate tuning"]}
+
+\subsection{Results}
+
+Table~\ref{tab:results} summarizes our experimental results. \textcolor{red}{[Interpret the results - what improved performance? By how much?]}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Configuration} & \textbf{Val} & \textbf{Test} \\
+\midrule
+Baseline & - & 0.726 \\
+\textcolor{red}{Exp 1: ...} & \textcolor{red}{.XXX} & \textcolor{red}{.XXX} \\
+\textcolor{red}{Exp 2: ...} & \textcolor{red}{.XXX} & \textcolor{red}{.XXX} \\
+\textcolor{red}{Exp 3: ...} & \textcolor{red}{.XXX} & \textcolor{red}{.XXX} \\
+\midrule
+\textbf{Final Model} & \textcolor{red}{\textbf{.XXX}} & \textcolor{red}{\textbf{.XXX}} \\
+\bottomrule
+\end{tabular}
+\caption{Experimental results comparison}
+\label{tab:results}
+\end{table}
+
+\begin{figure}[t]
+    \centering
+    \textcolor{red}{[INSERT TRAINING CURVES FIGURE]}
+    
+    \textcolor{red}{Example: \textbackslash includegraphics[width=\textbackslash columnwidth]\{training\_curves.png\}}
+    \caption{Training and validation accuracy curves over epochs}
+    \label{fig:curves}
+\end{figure}
+
+Figure~\ref{fig:curves} shows training dynamics. \textcolor{red}{[Describe: Did you observe overfitting? When did convergence occur?]}
+
+\subsection{What Worked}
+
+\textcolor{red}{[Describe successful strategies:]}
+
+\begin{itemize}
+    \item \textcolor{red}{Strategy 1 and its impact (+X\% accuracy)}
+    \item \textcolor{red}{Strategy 2 and why it helped}
+    \item \textcolor{red}{Key hyperparameter choices}
+\end{itemize}
+
+\subsection{What Didn't Work}
+
+\textcolor{red}{[Describe failed attempts:]}
+
+\begin{itemize}
+    \item \textcolor{red}{Approach that failed and potential reasons}
+    \item \textcolor{red}{Another unsuccessful experiment}
+\end{itemize}
+
+\subsection{Error Analysis}
+
+\textcolor{red}{[Analyze failure cases: What types of questions does your model struggle with? Provide 1-2 concrete examples of misclassifications. Any patterns in errors?]}
+
+\textbf{Example Error:} \textcolor{red}{[Show a specific misclassified case]}
+
+\section{Discussion}
+
+Our final model achieves \textcolor{red}{X.XXX} accuracy, representing a \textcolor{red}{[X\% improvement/reduction]} relative to the baseline. \textcolor{red}{[Discuss: Why did your approach work? What are computational trade-offs? How might the model generalize?]}
+
+\textbf{Challenges:} \textcolor{red}{[Discuss main challenges: computational constraints, hyperparameter tuning difficulty, overfitting, etc.]}
+
+
+\section{Conclusion}
+
+We successfully fine-tuned Llama-3 8B for math answer verification using LoRA-based parameter-efficient training. \textcolor{red}{[Summarize key findings and final performance]}. 
+
+\textbf{Future Work:} \textcolor{red}{[1-2 sentences on potential improvements: larger models, ensemble methods, better prompts, etc.]}
+
+
+
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{llama3}
+Meta AI.
+\newblock Llama 3 Model Card.
+\newblock \url{https://github.com/meta-llama/llama3}, 2024.
+
+\bibitem{lora}
+Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen.
+\newblock LoRA: Low-Rank Adaptation of Large Language Models.
+\newblock In \textit{International Conference on Learning Representations (ICLR)}, 2022.
+
+\bibitem{attention}
+\textcolor{red}{[Add reference 3]}
+
+\bibitem{mathematical}
+\textcolor{red}{[Add reference 4]}
+
+\end{thebibliography}
+\section*{Acknowledgments}
+
+\textcolor{red}{Mention about AI tools if used any.}
+\end{document}
