@@ -47,7 +47,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent This report presents our approach to the Math Question Answer Verification Competition, where we supervised fine-tune a Llama-3 8B model to predict the correctness of mathematical answers. We detail our methodology including data preprocessing, LoRA-based parameter-efficient fine-tuning, prompt engineering strategies, and extensive hyperparameter optimization. Our experiments demonstrate \textcolor{red}{[describe your achievement, e.g., "significant improvement over the baseline"]}, achieving a final test accuracy of \textcolor{red}{X.XXX}. We analyze what techniques proved effective and discuss the challenges encountered. Code and model weights are available at \href{https://github.com/xiaozhoudev/CS-GY-6953-DL-Midterm}{xiaozhoudev/CS-GY-6953-DL-Midterm}.
+\noindent This report presents our approach to the Math Question Answer Verification Competition, where we supervised fine-tune a Llama-3 8B model to predict the correctness of mathematical answers. We detail our methodology including data preprocessing, LoRA-based parameter-efficient fine-tuning, prompt engineering strategies, and extensive hyperparameter optimization. Our experiments demonstrate Our experiments demonstrate a 16.1\% relative improvement over the 0.726 baseline, achieving a final test accuracy of \textbf{84.288\%}. We analyze what techniques proved effective and discuss the challenges encountered. Code and model weights are available at \href{https://github.com/xiaozhoudev/CS-GY-6953-DL-Midterm}{xiaozhoudev/CS-GY-6953-DL-Midterm}.
 \end{abstract}
 
 \section{Introduction}
@@ -56,9 +56,15 @@ Automated verification of mathematical answers is essential for intelligent tuto
 
 Large Language Models (LLMs) have shown remarkable capabilities in mathematical reasoning~\cite{llama3}, making them ideal candidates for this task. However, fine-tuning such large models requires efficient techniques due to computational constraints. We employ Low-Rank Adaptation (LoRA)~\cite{lora} to make fine-tuning tractable while maintaining performance.
 
-\textbf{Our Approach:} \textcolor{red}{[Briefly describe your main strategy in 2-3 sentences]}
+\textbf{Our Approach:} Our main strategy involved iterative experimentation, focusing on data volume, class balancing, and prompt engineering. We found that a combination of undersampling the majority class for a balanced dataset and using a role-based 'teacher' prompt---which explicitly included the 'question', 'solution' and 'answer' fields---yielded the best results.
 
-\textbf{Contributions:} \textcolor{red}{[List 2-3 key contributions/findings]}
+\textbf{Contributions:} Our key findings are:
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item We demonstrate that prompt engineering (specifically, adding a 'teacher' persona and including the separate `answer` field) provided the most significant accuracy boost, jumping from 81.754\% to 84.148\%.
+    \item We show that training on a larger, class-balanced dataset (up to $\sim$40,000 samples) consistently improved performance.
+    \item We identify an effective set of hyperparameters (cosine LR scheduler, $r=128$, and zero LoRA dropout) for this task.
+\end{itemize}
 
 \section{Dataset}
 
@@ -66,18 +72,10 @@ Large Language Models (LLMs) have shown remarkable capabilities in mathematical 
 The dataset consists of mathematical questions paired with answers and correctness labels. Each instance contains: (1) \textit{question}: the math problem, (2) \textit{answer}: provided solution (correct/incorrect), (3) \textit{solution}: detailed reasoning, and (4) \textit{is\_correct}: binary label (True/False).
 
 \subsection{Data Analysis}
-\textcolor{red}{[Provide key statistics:]}
-
-\textcolor{red}{Dataset size: X training, Y validation, Z test samples}
-
-\textcolor{red}{Label distribution: X\% correct, Y\% incorrect}
-
-\textcolor{red}{Average lengths: Questions (X tokens), Answers (Y tokens)}
-
-\textcolor{red}{Question type breakdown (if analyzed)}
+The full dataset provides 1,000,000 training samples and 10,000 test samples. A preliminary analysis of a 50,000-sample subset revealed an imbalance: 30,033 (60.1\%) samples were labeled `False` and 19,967 (39.9\%) were `True`. To address this, we used 1:1 balanced undersampling. Our final model was trained on a 50,000-sample subset, which was undersampled to a balanced 39,934 samples. We used a 2,000-sample slice for validation. We set a \texttt{max\_seq\_length} of 6144 tokens to accommodate lengthy problem descriptions and solutions.
 
 \subsection{Preprocessing}
-We apply several preprocessing steps: \textcolor{red}{[List your preprocessing"]}. We construct prompts by combining question, answer, and optionally solution text following the template shown in Section~\ref{sec:prompt}.
+We applied several preprocessing steps. We implemented a \texttt{clean\_solution\_text} function to remove HTML tags (e.g., '<llm-code>') and LaTeX artifacts (e.g., \verb|'\boxed{}'|) from the solution text to normalize the input. We constructed our final prompt by combining the `question`, the cleaned `solution`, and the `answer` text, as shown in Section~\ref{sec:prompt}.
 
 \section{Methodology}
 
@@ -85,145 +83,156 @@ We apply several preprocessing steps: \textcolor{red}{[List your preprocessing"]
 
 \textbf{Llama-3 8B:} We use Llama-3 8B as our base model, a state-of-the-art transformer with 8 billion parameters featuring improved tokenization and extended context length capabilities.
 
-\textbf{LoRA Fine-Tuning:} Given memory constraints, we employ Low-Rank Adaptation (LoRA) which introduces trainable low-rank matrices into attention layers while freezing pre-trained weights. This dramatically reduces trainable parameters from 8B to approximately \textcolor{red}{X}M parameters.
+\textbf{LoRA Fine-Tuning:} Given memory constraints, we employ Low-Rank Adaptation (LoRA) which introduces trainable low-rank matrices into attention layers while freezing pre-trained weights. This dramatically reduces trainable parameters from 8B to approximately 336M parameters.
 
-Our LoRA configuration: rank $r=\textcolor{red}{X}$, alpha $\alpha=\textcolor{red}{X}$, dropout $=\textcolor{red}{0.X}$, targeting \textcolor{red}{[query/key/value]} projection matrices.
+\textbf{Our LoRA configuration:} rank $r=128$, alpha $\alpha=256$, dropout $=0.0$, targeting all 7 key modules: \texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj}, \texttt{o\_proj}, \texttt{gate\_proj}, \texttt{up\_proj}, and \texttt{down\_proj}.
 
-\textcolor{red}{[If using quantization:] We apply \textcolor{red}{X}-bit quantization using bitsandbytes library to further reduce memory footprint.}
+We apply 4-bit quantization using 'bitsandbytes' to further reduce the memory footprint, enabling us to train on a single GPU.
 
 \subsection{Prompt Engineering}
 \label{sec:prompt}
 
-We formulate the task as an instruction-following problem. Our final prompt template:
+We formulated the task as an instruction-following problem. Our final, most successful prompt (used in Exp 4 \& 5):
 
 \begin{small}
 \begin{verbatim}
-Question: {question}
-Answer: {answer}
-[Solution: {solution}]
+You are a teacher with great 
+mathematician skilled in verifying 
+mathematical solutions.Your task is
+to determine if the student's solution
+correctly solves the math question.
+Below is the teacher's question and 
+stuent's solution.
 
-Determine if the answer is correct.
-Respond with True or False only.
+Teacher's Question:
+{}.
+
+Student's Solution:
+{}.
+
+Student's final answer:
+{}.
+
+Output 'True' if the solution is fully
+correct (sound reasoning, correct logic,
+and accurate final answer), otherwise 
+'False'.
+
+Output:
+{}
 \end{verbatim}
 \end{small}
 
-\textcolor{red}{[Discuss: Did you include solution text? Why/why not? What other prompts did you try?]}
+Our key finding (Exp 3 vs. Exp 4) was that including the `answer` field separately from the `solution` text was critical. Our initial prompt (Exp 1-3) only used `question` and `solution`, yielding a max score of 81.754\%. The new 'teacher' prompt, which also formatted the `answer` field, immediately boosted this to 84.148\%.
 
 \subsection{Training Configuration}
 
-Table~\ref{tab:hyperparams} shows our training hyperparameters. \textcolor{red}{[Briefly justify key choices, e.g., "We use a small learning rate to prevent catastrophic forgetting"]}
+Table~\ref{tab:hyperparams} shows our final training hyperparameters. We used a cosine scheduler for smooth convergence and found that a \texttt{learning\_rate} of 6e-5 with a small \texttt{weight\_decay} of 0.005 worked best. LoRA dropout was set to 0, as it improved performance over 0.1 in our experiments.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \small
 \begin{tabular}{lc}
 \toprule
 \textbf{Hyperparameter} & \textbf{Value} \\
 \midrule
-Learning Rate & \textcolor{red}{X.Xe-X} \\
-Batch Size & \textcolor{red}{X} \\
-Gradient Accumulation & \textcolor{red}{X} \\
-Epochs & \textcolor{red}{X} \\
-Max Sequence Length & \textcolor{red}{XXX} \\
-Warmup Steps & \textcolor{red}{XXX} \\
-Weight Decay & \textcolor{red}{0.0X} \\
-Optimizer & \textcolor{red}{AdamW} \\
-LR Scheduler & \textcolor{red}{cosine} \\
+Learning Rate & 6.0e-5 \\
+Batch Size & 16 \\
+Gradient Accumulation & 4 \\
+Effective Batch Size & 64 \\
+Epochs & 5 \\
+Max Sequence Length & 6144 \\
+Warmup Steps & 10 \\
+Weight Decay & 0.005 \\
+Optimizer & AdamW (8-bit) \\
+LR Scheduler & cosine \\
+LoRA Rank ($r$) & 128 \\
+LoRA Alpha ($\alpha$) & 256 \\
+LoRA Dropout & 0.0 \\
 \bottomrule
 \end{tabular}
-\caption{Training hyperparameters}
+\caption{Final model (Exp 5) hyperparameters}
 \label{tab:hyperparams}
 \end{table}
 
-We use cross-entropy loss and train for \textcolor{red}{X} epochs on \textcolor{red}{[GPU type, e.g., "A100 40GB"]}. Training takes approximately \textcolor{red}{X hours}.
+We used cross-entropy loss and trained for 5 epochs on an NVIDIA A100 GPU. The final training run took approximately 8.5 hours.
 
 \section{Experiments and Results}
 
 \subsection{Baseline Performance}
 
-We first evaluate the provided baseline model, which achieves 0.726 test accuracy. \textcolor{red}{[Describe baseline approach briefly]}
+We first evaluate the provided baseline model, which achieves 0.726 test accuracy.
 
 \subsection{Experimental Setup}
 
-We conduct ablation studies to understand the impact of different components:
-
-\textbf{Experiment 1:} \textcolor{red}{[e.g., "Impact of solution text in prompt"]}
-
-\textbf{Experiment 2:} \textcolor{red}{[e.g., "LoRA rank variation"]}
-
-\textbf{Experiment 3:} \textcolor{red}{[e.g., "Learning rate tuning"]}
+We conducted 5 main experiments, iteratively building on our findings.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item \textbf{Exp 1:} Baseline (8k data, 5 epochs, 5e-5 LR, BSize 32).
+    \item \textbf{Exp 2:} Exp 1 + BSize 16 (doubled update steps).
+    \item \textbf{Exp 3:} Exp 2 + More data ($\sim$16k samples, 3 epochs).
+    \item \textbf{Exp 4:} Exp 3 + More data ($\sim$24k, 5 epochs), new 'Teacher' prompt, \& new hyperparams (6e-5 LR, cosine, 0 dropout).
+    \item \textbf{Exp 5 (Final):} Exp 4 + More data ($\sim$40k samples).
+\end{itemize}
 
 \subsection{Results}
+Table~\ref{tab:results} summarizes our results. The two major improvements came from the prompt/hyperparameter change in Exp 4 and the data increases. The final model (Exp 5) achieved 85.50\% validation accuracy and 84.288\% on the private Kaggle leaderboard.
 
-Table~\ref{tab:results} summarizes our experimental results. \textcolor{red}{[Interpret the results - what improved performance? By how much?]}
-
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \small
 \begin{tabular}{lcc}
 \toprule
-\textbf{Configuration} & \textbf{Val} & \textbf{Test} \\
+\textbf{Configuration} & \textbf{Val Acc.} & \textbf{Test Score} \\
 \midrule
-Baseline & - & 0.726 \\
-\textcolor{red}{Exp 1: ...} & \textcolor{red}{.XXX} & \textcolor{red}{.XXX} \\
-\textcolor{red}{Exp 2: ...} & \textcolor{red}{.XXX} & \textcolor{red}{.XXX} \\
-\textcolor{red}{Exp 3: ...} & \textcolor{red}{.XXX} & \textcolor{red}{.XXX} \\
+Provided Baseline & - & 0.72600 \\
+Exp 1: 8k data, BSize 32 & 83.40\% & 0.79742 \\
+Exp 2: 8k data, BSize 16 & 83.20\% & 0.80647 \\
+Exp 3: 16k data, 3 Epochs & 83.25\% & 0.81754 \\
+Exp 4: 24k data, New Prompt & 84.85\% & 0.84148 \\
 \midrule
-\textbf{Final Model} & \textcolor{red}{\textbf{.XXX}} & \textcolor{red}{\textbf{.XXX}} \\
+\textbf{Exp 5: 40k data, Final} & \textbf{85.50\%} & \textbf{0.84288} \\
 \bottomrule
 \end{tabular}
 \caption{Experimental results comparison}
 \label{tab:results}
 \end{table}
 
-\begin{figure}[t]
-    \centering
-    \textcolor{red}{[INSERT TRAINING CURVES FIGURE]}
-    
-    \textcolor{red}{Example: \textbackslash includegraphics[width=\textbackslash columnwidth]\{training\_curves.png\}}
-    \caption{Training and validation accuracy curves over epochs}
-    \label{fig:curves}
-\end{figure}
-
-Figure~\ref{fig:curves} shows training dynamics. \textcolor{red}{[Describe: Did you observe overfitting? When did convergence occur?]}
-
 \subsection{What Worked}
 
-\textcolor{red}{[Describe successful strategies:]}
-
 \begin{itemize}
-    \item \textcolor{red}{Strategy 1 and its impact (+X\% accuracy)}
-    \item \textcolor{red}{Strategy 2 and why it helped}
-    \item \textcolor{red}{Key hyperparameter choices}
+    \setlength\itemsep{0em}
+    \item \textbf{Prompt Engineering:} Changing to our final 'teacher' prompt and \textit{including the `answer` field} was the most
+    impactful change, responsible for the jump from 81.754\% to 84.148\%.
+    \item \textbf{Data Scaling \& Balancing:} Increasing the training data from 8,000 to $\sim$40,000 samples and applying 1:1 class balancing via undersampling steadily increased performance.
+    \item \textbf{Hyperparameter Tuning:} Switching to a `cosine` LR scheduler and removing \texttt{lora\_dropout} (setting to 0.0) were critical for the Exp 4 breakthrough.
 \end{itemize}
 
 \subsection{What Didn't Work}
 
-\textcolor{red}{[Describe failed attempts:]}
-
 \begin{itemize}
-    \item \textcolor{red}{Approach that failed and potential reasons}
-    \item \textcolor{red}{Another unsuccessful experiment}
+    \setlength\itemsep{0em}
+    \item \textbf{Initial Batch Size:} Our first experiment with a batch size of 32 (Exp 1) performed worse (79.742\%) than the identical setup with a batch size of 16 (Exp 2, 80.647\%). This suggests that more frequent gradient updates were beneficial.
+    \item \textbf{LoRA Dropout:} We found that \texttt{lora\_dropout = 0.1} (used in Exp 1-3) consistently underperformed \texttt{lora\_dropout = 0}. Regularization via LoRA dropout was not necessary for this task.
 \end{itemize}
 
 \subsection{Error Analysis}
 
-\textcolor{red}{[Analyze failure cases: What types of questions does your model struggle with? Provide 1-2 concrete examples of misclassifications. Any patterns in errors?]}
+From the validation report of our final model (Exp 5), we achieved 85.50\% accuracy. The model had higher recall for `False` (90\%) but lower recall for `True` (78\%). This means the model is excellent at identifying incorrect solutions but is more likely to misclassify a \textit{correct} solution as `False`. These false negatives (correct answers marked as false) appear to be the main source of error, suggesting the model is overly critical or gets confused by correct-but-unconventional reasoning paths.
 
-\textbf{Example Error:} \textcolor{red}{[Show a specific misclassified case]}
 
 \section{Discussion}
 
-Our final model achieves \textcolor{red}{X.XXX} accuracy, representing a \textcolor{red}{[X\% improvement/reduction]} relative to the baseline. \textcolor{red}{[Discuss: Why did your approach work? What are computational trade-offs? How might the model generalize?]}
+Our final model achieves 84.288\% accuracy, representing a 16.1\% relative improvement over the baseline. Our systematic approach isolated prompt engineering and data scaling as the two most important factors. The 'teacher' prompt likely framed the task more effectively. Providing the `answer` field separately allowed the model to directly compare the reasoned `solution` against the provided `answer`, rather than trying to infer the answer *from* the solution text.
 
-\textbf{Challenges:} \textcolor{red}{[Discuss main challenges: computational constraints, hyperparameter tuning difficulty, overfitting, etc.]}
+\textbf{Challenges:} The main challenge was the long training time, with our final model taking over 8.5 hours. This limited the number of full-scale experiments we could run. Another challenge was the dataset imbalance, which we addressed with undersampling. This was effective but meant we discarded a large portion of the majority class data.
 
 
 \section{Conclusion}
 
-We successfully fine-tuned Llama-3 8B for math answer verification using LoRA-based parameter-efficient training. \textcolor{red}{[Summarize key findings and final performance]}. 
+We successfully fine-tuned Llama-3 8B for math answer verification using LoRA. Our iterative approach of data scaling, class balancing, and prompt engineering resulted in a final Kaggle score of 84.288\%. The most critical factor was a prompt redesign that included the `answer` field and adopted a 'teacher' persona.
 
-\textbf{Future Work:} \textcolor{red}{[1-2 sentences on potential improvements: larger models, ensemble methods, better prompts, etc.]}
+\textbf{Future Work:} Future work could explore training on the full 1M dataset, experimenting with different class balancing techniques (e.g., oversampling, T5-based pre-training), or ensembling models trained on different data subsets.
 
 
 
@@ -241,14 +250,14 @@ Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean W
 \newblock LoRA: Low-Rank Adaptation of Large Language Models.
 \newblock In \textit{International Conference on Learning Representations (ICLR)}, 2022.
 
-\bibitem{attention}
-\textcolor{red}{[Add reference 3]}
+\bibitem{unsloth}
+Unsloth AI.
+\newblock Unsloth Library.
+\newblock \url{https://github.com/unslothai/unsloth}, 2024.
 
-\bibitem{mathematical}
-\textcolor{red}{[Add reference 4]}
 
 \end{thebibliography}
 \section*{Acknowledgments}
 
-\textcolor{red}{Mention about AI tools if used any.}
+We utilized Google Colab with NVIDIA A100 GPUs for model training, the Unsloth library for memory-efficient 4-bit fine-tuning and used chatGPT to learn the unsloth library and the hyperparameter for fine-tuning.
 \end{document}
